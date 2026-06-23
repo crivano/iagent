@@ -15,9 +15,12 @@
     "lint": "pnpm -r --filter=./packages/* run lint",
     "clean": "pnpm -r exec rimraf dist *.tsbuildinfo",
     "test:ui": "vitest --ui",
-    "dev:demo": "pnpm --filter @iagente/runtime-script-tag dev"
+    "dev:demo": "pnpm --filter @iagente/runtime-script-tag dev",
+    "slides:serve": "npx --yes serve slides -l 8000",
+    "slides:render": "node slides/render-diagrams.mjs"
   },
   "devDependencies": {
+    "@hpcc-js/wasm": "^2.34.2",
     "@types/node": "^22.10.0",
     "@vitest/ui": "^2.1.0",
     "prettier": "^3.4.0",

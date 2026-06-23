@@ -1,0 +1,38 @@
+// Vision: 3 zones (host / kernel / app)
+// Render: dot -Tpng 01-layers.dot -o 01-layers.png
+digraph layers {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, color="#4f8cff", fillcolor="#1a2333", fontcolor="#e8e8e8"];
+  edge [color="#9aa0a6", fontname="Helvetica", fontsize=10, fontcolor="#9aa0a6"];
+
+  subgraph cluster_host {
+    label="Host page (eproc / PJe / SEI / demo)";
+    style="rounded,dashed"; color="#4f8cff"; fontcolor="#4f8cff"; fontsize=12;
+    HD [label="Host adapter\nICaseManagementSystem\nIDocumentManagementSystem"];
+  }
+
+  subgraph cluster_kernel {
+    label="iAgente kernel (injected via <script>)";
+    style="rounded,filled"; color="#f5a623"; fillcolor="#2a2418"; fontcolor="#f5a623"; fontsize=12;
+    BUS  [label="CapabilityBus", color="#f5a623", fillcolor="#3a2f15"];
+    REG  [label="AppRegistry",  color="#f5a623", fillcolor="#3a2f15"];
+    ORCH [label="Orchestrator", color="#f5a623", fillcolor="#3a2f15"];
+    UI   [label="UI shell\nFloatingButton + SplitPane", color="#f5a623", fillcolor="#3a2f15"];
+  }
+
+  subgraph cluster_apps {
+    label="External apps (iframe / react-bundled / headless)";
+    style="rounded,dashed"; color="#3ecf8e"; fontcolor="#3ecf8e"; fontsize=12;
+    APOIA [label="apoia (iframe)", color="#3ecf8e", fillcolor="#15301f"];
+    NPS   [label="nps (react)",   color="#3ecf8e", fillcolor="#15301f"];
+  }
+
+  HD   <-> ORCH [label="detect\n+ activate"];
+  ORCH -> BUS   [label="register"];
+  ORCH -> REG   [label="register"];
+  BUS  <-> APOIA [label="JSON-RPC\n(postMessage)"];
+  BUS  <-> NPS   [label="JSON-RPC\n(in-process)"];
+  UI   -> REG   [style=dashed, label="reads menu"];
+  UI   -> BUS   [style=dashed, label="invokes intent"];
+}

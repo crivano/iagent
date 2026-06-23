@@ -115,7 +115,7 @@ export function startIagente(opts: {
   }
 
   // --- 5. Mount overlay + IagenteShell ---
-  const overlay = createOverlay({ css: SHELL_CSS, hostTag: 'iagente-overlay' });
+  const overlay = createOverlay({ css: SHELL_CSS, hostTag: 'iagente-overlay', document: doc });
 
   const openHost = () => doc.documentElement.classList.add('iagente-open');
   const closeHost = () => doc.documentElement.classList.remove('iagente-open');
@@ -257,19 +257,6 @@ const RuntimeRoot: FC<RuntimeRootProps> = ({
     />
   );
 };
-
-/**
- * Auto-start hook: when this bundle is loaded inside a browser `window`,
- * start iAgente automatically as soon as the DOM is ready.
- *
- * SKIPPED in test environments (vitest/jest) so unit tests can call
- * startIagente() themselves and not race an auto-started instance.
- */
-const IS_TEST_ENV =
-  typeof process !== 'undefined' &&
-  (process.env?.NODE_ENV === 'test' ||
-    // Vitest worker global flag.
-    (globalThis as { __vitest_worker__?: unknown }).__vitest_worker__ !== undefined);
 
 /**
  * Auto-start hook: when this bundle is loaded as a script tag in a browser,

@@ -1,0 +1,26 @@
+// CapabilityBus (impl) vs AppRegistry (metadata)
+digraph registry_compare {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [shape=record, fontname="Helvetica", fontsize=11, color="#e8e8e8"];
+  edge [color="#9aa0a6"];
+
+  BUS [label="{ CapabilityBus | { producers: impl / transport | key: 'ai' | priority: number | onChange() } }",
+       color="#4f8cff", fillcolor="#1a2333"];
+
+  REG [label="{ AppRegistry | { descriptors: id, name, intents, ui | categories: IntentCategory | applyPreferredApp() } }",
+       color="#3ecf8e", fillcolor="#15301f"];
+
+  APP [label="AppDescriptor\n(id, name, capability,\nintents, ui, createAssistant)",
+       color="#f5a623", fillcolor="#2a2418", shape=note];
+
+  APP -> BUS  [label="register()\nwires assistant", color="#f5a623"];
+  APP -> REG  [label="register()\nstores descriptor", color="#f5a623"];
+
+  UI [label="UI shell\n(menu, settings)", shape=box, color="#ff5d8f", fillcolor="#2a1a1f"];
+  UI -> REG  [style=dashed, label="reads"];
+  UI -> BUS  [style=dashed, label="invokes"];
+
+  STORAGE [label="IStorage\n(preferredApp key)", shape=cylinder, color="#9aa0a6"];
+  STORAGE -> REG [label="persists", style=dotted];
+}

@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iAgente — Arquitetura</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css" id="theme" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css" />
+
+  <style>
+    :root {
+      --iagente-blue: #4f8cff;
+      --iagente-amber: #f5a623;
+      --iagente-green: #3ecf8e;
+      --iagente-rose:  #ff5d8f;
+      --iagente-mute:  #9aa0a6;
+    }
+    .reveal { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .reveal h1, .reveal h2, .reveal h3 { color: #fff; letter-spacing: -0.02em; }
+    .reveal h1 { font-size: 2.4em; }
+    .reveal h2 { font-size: 1.7em; }
+    .reveal h3 { font-size: 1.25em; color: var(--iagente-blue); }
+    .reveal pre { width: 100%; font-size: 0.45em; box-shadow: 0 0 24px rgba(0,0,0,0.4); }
+    .reveal pre code { padding: 18px 22px; border-radius: 8px; max-height: 560px; }
+    .reveal code { font-family: "JetBrains Mono", "Fira Code", Consolas, monospace; }
+    .reveal .muted  { color: var(--iagente-mute); }
+    .reveal .accent { color: var(--iagente-blue); }
+    .reveal .amber  { color: var(--iagente-amber); }
+    .reveal .green  { color: var(--iagente-green); }
+    .reveal .rose   { color: var(--iagente-rose); }
+    .reveal .small  { font-size: 0.6em; }
+    .reveal .tiny   { font-size: 0.45em; }
+    .reveal .pill {
+      display: inline-block; padding: 2px 10px; border-radius: 999px;
+      background: rgba(79,140,255,0.15); color: var(--iagente-blue);
+      font-size: 0.5em; vertical-align: middle; margin-left: 6px;
+    }
+    .reveal .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .reveal .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+    .reveal .card {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px; padding: 18px 20px; text-align: left;
+    }
+    .reveal .card h3 { margin-top: 0; }
+    .reveal table { margin: 0 auto; border-collapse: collapse; font-size: 0.6em; }
+    .reveal th, .reveal td { padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .reveal th { color: var(--iagente-blue); }
+    .reveal .mermaid { background: transparent !important; }
+    .reveal .mermaid svg { max-height: 520px; max-width: 100%; }
+    .reveal .footer {
+      position: absolute; bottom: 18px; right: 24px;
+      font-size: 0.4em; color: var(--iagente-mute);
+    }
+    /* Compact code blocks (data-trim not used; we trim manually) */
+    .reveal pre.compact { font-size: 0.4em; }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- ============================================================== -->
+      <!-- 1. CAPA                                                        -->
+      <!-- ============================================================== -->
+      <section data-state="title">
+        <h1>iAgente</h1>
+        <h3 style="color: var(--iagente-mute); font-weight: 400;">
+          Capability bus + JSON-RPC para desacoplar<br/>
+          hospedeiros (eproc, PJe, SEI, Siga-Doc) de apps externos
+        </h3>
+        <p class="muted small">
+          Framework injetável · 11 pacotes · 153 testes · TypeScript 5.7 + React 19
+        </p>
+        <p class="footer">iAgente · POC arquitetural</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 2. O PROBLEMA                                                 -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>O problema</h2>
+        <div class="two-col" style="margin-top: 30px;">
+          <div class="card">
+            <h3>Hospedeiros</h3>
+            <p>eproc, PJe, SEI, Siga-Doc&hellip;</p>
+            <p class="muted small">Cada um com DOM próprio, sessão própria, ciclo de vida próprio.</p>
+          </div>
+          <div class="card">
+            <h3>Aplicações externas</h3>
+            <p>Apoia, Assis, NPS, ferramentas internas&hellip;</p>
+            <p class="muted small">Cada uma com URL, autenticação e contrato próprio.</p>
+          </div>
+        </div>
+        <p class="amber" style="margin-top: 36px;">Sem mediação: <b>N hospedeiros × M apps = N×M integrações</b></p>
+        <p class="green">Com um barramento: <b>N + M adaptadores</b></p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 3. A IDEIA-NÚCLEO                                             -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>A ideia-núcleo</h2>
+        <p class="muted">Acoplar por <b>interface</b>, não por <b>implementação</b></p>
+        <pre><code class="language-typescript">// O botão "Resumir" NÃO pede "a Apoia".
+// Pede alguém que implementa a interface:
+
+interface IAICollaborator {
+  readonly capabilityId: 'ai';
+  beginSession(ctx: LaunchContext): Promise&lt;SessionHandle&gt;;
+}
+
+// O kernel resolve QUAL implementação está ativa.
+// Trocar Apoia → Assis é 0 linhas de mudança no botão.</code></pre>
+        <p class="muted small">Este é o <b>único</b> acoplamento: o nome da interface.</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 4. VISÃO GERAL DE CAMADAS                                     -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>Visão geral · 3 zonas</h2>
+        <div class="mermaid">
+flowchart LR
+  subgraph HOST["Host page (eproc / PJe / SEI / demo)"]
+    HD["Host adapter&lt;br/&gt;ICaseManagementSystem&lt;br/&gt;IDocumentManagementSystem"]
+  end
+  subgraph KERNEL["iAgente kernel (injected via script)"]
+    BUS["CapabilityBus"]
+    REG["AppRegistry"]
+    ORCH["Orchestrator"]
+    UI["UI shell&lt;br/&gt;FloatingButton + SplitPane"]
+  end
+  subgraph APPS["External apps (iframe / react-bundled / headless)"]
+    APOIA["apoia (iframe)"]
+    NPS["nps (react)"]
+  end
+
+  HD   &lt;--&gt; ORCH
+  ORCH --&gt; BUS
+  ORCH --&gt; REG
+  BUS  &lt;--&gt; APOIA
+  BUS  &lt;--&gt; NPS
+  UI   --&gt; REG
+  UI   --&gt; BUS
+        </div>
+        <p class="muted small">O kernel vive no <code>window</code> do hospedeiro; os apps vivem em iframes isolados ou são bundleados no próprio kernel.</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 5. MONOREPO                                                    -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>Monorepo · 11 pacotes</h2>
+        <div class="mermaid">
+flowchart TB
+  subgraph RT["runtime/"]
+    RUNTIME["script-tag&lt;br/&gt;(IIFE bundle)"]
+  end
+  subgraph APPS_PKG["apps/"]
+    APPOIA["app-apoia&lt;br/&gt;(iframe adapter)"]
+    APPNPS["app-nps&lt;br/&gt;(react adapter)"]
+    APPDEMO["demo-app&lt;br/&gt;(sandbox)"]
+  end
+  subgraph HOSTS_PKG["hosts/"]
+    HOSTDEMO["demo-host&lt;br/&gt;(sandbox)"]
+  end
+  subgraph UI_PKG["ui/"]
+    UI["shell, panels, menu"]
+  end
+  subgraph CORE_PKG["core/"]
+    CORE["bus, registry, detector"]
+  end
+  subgraph SDK_PKG["sdk/"]
+    SDK["@iagente/app-sdk"]
+  end
+  subgraph RPC_PKG["rpc/"]
+    RPC["proxy, transports"]
+  end
+  subgraph PROTO_PKG["protocol/"]
+    PROTO["interfaces, JSON-RPC"]
+  end
+  subgraph STORAGE_PKG["storage/"]
+    STORAGE["IStorage abstraction"]
+  end
+
+  RUNTIME --&gt; UI
+  RUNTIME --&gt; CORE
+  RUNTIME --&gt; APPOIA
+  RUNTIME --&gt; APPNPS
+  RUNTIME --&gt; HOSTDEMO
+  RUNTIME --&gt; STORAGE
+  UI --&gt; CORE
+  UI --&gt; PROTO
+  APPOIA --&gt; SDK
+  APPNPS --&gt; SDK
+  APPDEMO --&gt; SDK
+  APPOIA --&gt; PROTO
+  APPNPS --&gt; PROTO
+  HOSTDEMO --&gt; PROTO
+  CORE --&gt; PROTO
+  CORE --&gt; RPC
+  RPC --&gt; PROTO
+  SDK --&gt; PROTO
+  SDK --&gt; RPC
+        </div>
+        <p class="muted small"><code>protocol</code> é folha — todos os outros pacotes dependem dele, e ele de ninguém.</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 6. CAPABILITY BUS                                              -->
+      <!-- ============================================================== -->
+      <section>
+        <h2><code>CapabilityBus</code> &mdash; implementações</h2>
+        <p>Registro central de <b>proxies</b> por chave (<code>'case' | 'doc' | 'ai' | 'feedback'</code>).</p>
+        <pre><code class="language-typescript">class CapabilityBus {
+  register&lt;K extends CapabilityKey&gt;(reg: CapabilityRegistration&lt;K&gt;): () =&gt; void;
+  getActive&lt;K extends CapabilityKey&gt;(key: K): CapabilityOf&lt;K&gt;;
+  listProviders(key: CapabilityKey): readonly { provider, priority }[];
+  setActive(key, provider: string): void;
+  onChange(listener): () =&gt; void;
+}
+
+// Producers publicam por interface:
+bus.register({
+  key: 'ai',
+  provider: 'apoia',
+  impl: new ApoiaAssistant(...),   // local
+  // ou: transport: iframeTransport,   // remote (cria proxy lazy)
+});</code></pre>
+        <p class="muted small">Vários producers por chave &mdash; prioridade decide o ativo. <code>onChange</code> reativa a UI.</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 7. APP REGISTRY                                                -->
+      <!-- ============================================================== -->
+      <section>
+        <h2><code>AppRegistry</code> &mdash; metadados + UI</h2>
+        <p>Catálogo de apps conhecidos. <b>Paralelo</b> ao bus &mdash; o bus sabe "qual assistente está ativo", o registry sabe "que apps existem e como montar a UI".</p>
+        <pre><code class="language-typescript">interface AppDescriptor {
+  readonly id: 'apoia' | 'nps' | ...;
+  readonly name: string;
+  readonly categories: readonly IntentCategory[];
+  readonly capability: CapabilityKey;          // qual interface o app implementa
+  readonly intents: readonly IntentDescriptor[]; // menu entries
+  readonly ui: AppUi;                          // 'iframe' | 'react' | 'headless'
+  readonly createAssistant: (cfg: AssistantConfig) =&gt; IInteractiveAssistant;
+}
+
+type AppUi =
+  | { type: 'iframe'; urlBuilder, allowedOrigins, handshakeOnly? }
+  | { type: 'react';  root: (props) =&gt; unknown }
+  | { type: 'headless' };</code></pre>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 8. BUS vs REGISTRY                                             -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>CapabilityBus ≠ AppRegistry</h2>
+        <table>
+          <tr><th></th><th>CapabilityBus</th><th>AppRegistry</th></tr>
+          <tr><td>Armazena</td><td>implementações (proxies)</td><td>metadados (id, name, intents, UI)</td></tr>
+          <tr><td>1 app ↔ N entradas</td><td>1 (a ativa)</td><td>N (uma por intent)</td></tr>
+          <tr><td>Conhecido por</td><td>orquestrador, kernel</td><td>UI shell (menu, settings)</td></tr>
+          <tr><td>Trocar provider</td><td><code>setActive()</code></td><td><code>applyPreferredApp()</code></td></tr>
+          <tr><td>Persistência</td><td>não</td><td>sim (<code>STORAGE_KEYS.preferredApp</code>)</td></tr>
+        </table>
+        <p class="muted small" style="margin-top: 18px;">Conexão: <code>registerApp(bus, registry, descriptor)</code> faz <i>as duas coisas</i> &mdash; publica no registry e liga o <code>assistant</code> no bus.</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 9. JSON-RPC 2.0 ENVELOPE                                       -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>Transporte · JSON-RPC 2.0 + <code>postMessage</code></h2>
+        <p>Envelope único, independente do canal:</p>
+        <pre><code class="language-json">// Request (host → app)
+{
+  "jsonrpc": "2.0",
+  "id": "req-7c3a",
+  "method": "ai.beginSession",
+  "params": {
+    "intent": "summarize",
+    "documentId": "doc-1234",
+    "user": { "id": "u-42", "name": "Maria" }
+  }
+}
+
+// Response (app → host)
+{
+  "jsonrpc": "2.0",
+  "id": "req-7c3a",
+  "result": { "sessionId": "s-9912", "status": "ready" }
+}
+
+// Notification (sem id, sem response esperada)
+{ "jsonrpc": "2.0", "method": "host.documentChanged", "params": { ... } }</code></pre>
+        <p class="muted small">Namespacing: <code>method</code> = <code>capabilityId.action</code>. <code>createRpcProxy&lt;T&gt;()</code> em <code>@iagente/rpc</code> transforma a interface TS no envelope.</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 10. ITRANSPORT (canal)                                         -->
+      <!-- ============================================================== -->
+      <section>
+        <h2><code>ITransport</code> &mdash; o canal que muda, o envelope que não</h2>
+        <pre><code class="language-typescript">interface ITransport {
+  send(envelope: JsonRpcEnvelope): void;
+  onMessage(handler: (envelope: JsonRpcEnvelope) =&gt; void): () =&gt; void;
+}
+
+// Implementações:
+class PostMessageTransport implements ITransport { ... }   // iframe / popup
+class InProcessTransport  implements ITransport { ... }   // adapter local (testes, demo)
+
+// O bus registra um transport:
+bus.register({
+  key: 'ai',
+  provider: 'apoia',
+  transport: new PostMessageTransport(iframe.contentWindow, 'https://apoia.pdpj.jus.br'),
+});
+
+// O CapabilityBus envolve o transport num proxy tipado
+// que implementa a interface IInteractiveAssistant&lt;T&gt;.</code></pre>
+        <p class="muted small">Trocar de <code>postMessage</code> para WebSocket, SharedWorker, BroadcastChannel: nova classe, <b>zero mudança no kernel</b>.</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 11. DOMAIN INTERFACES                                          -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>Interfaces de domínio &mdash; o vocabulário</h2>
+        <table>
+          <tr><th>Interface</th><th>Lado</th><th>Implementado por</th></tr>
+          <tr><td><code>ICaseManagementSystem</code></td><td>host</td><td>eproc, PJe, demo-host</td></tr>
+          <tr><td><code>IDocumentManagementSystem</code></td><td>host</td><td>SEI, Siga-Doc</td></tr>
+          <tr><td><code>IInteractiveAssistant&lt;T&gt;</code></td><td>app</td><td>Apoia, Assis, NPS, demo-app</td></tr>
+          <tr><td><code>IFeedbackCollector</code></td><td>app</td><td>NPS, avaliações</td></tr>
+        </table>
+        <p class="muted small" style="margin-top: 18px;">Cada interface traz um <code>capabilityId</code> que vira namespace JSON-RPC. Adicionar uma nova capacidade = nova interface + 0 mudanças no kernel.</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 12. IINTERACTIVEASSISTANT                                      -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>De RPC para <i>sessão interativa</i></h2>
+        <p>Apps jurídicos não são funções one-shot. Têm <b>setup → múltiplas trocas → finalize</b>.</p>
+        <pre><code class="language-typescript">interface IInteractiveAssistant&lt;T extends AssistantIntent = AssistantIntent&gt; {
+  readonly capabilityId: 'ai';
+  readonly intents: readonly IntentDescriptor&lt;T&gt;[];
+
+  beginSession(ctx: LaunchContext): Promise&lt;SessionHandle&gt;;
+  // ^ setup: auth, carregar doc, abrir UI, handshake com iframe
+
+  resumeSession?(handle: SessionHandle): Promise&lt;void&gt;;
+  // ^ hot-reload: sobreviver a reload do host
+
+  finalizeSession(handle: SessionHandle, result: AssistantResult): Promise&lt;void&gt;;
+  // ^ teardown: gravar minuta, notificar host, fechar UI
+}
+
+type AssistantIntent = 'summarize' | 'review' | 'draft' | 'refine' | 'minuta' | 'chat';</code></pre>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 13. SESSÃO INTERATIVA - SEQUÊNCIA                              -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>Fluxo de uma sessão interativa</h2>
+        <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U as Usuário
+  participant H as Host (eproc)
+  participant K as iAgente kernel
+  participant A as App (Apoia iframe)
+
+  U->>H: clica "Resumir"
+  H->>K: launchApp({ intent: 'summarize', docId })
+  K->>K: applyPreferredApp() → resolve 'apoia'
+  K->>A: iframe src = buildApoiaUrl(ctx)
+  A-->>K: postMessage: app.handshake
+  K->>A: app.launch(ctx)
+  A->>A: beginSession(ctx) — auth, carregar doc
+  A-->>K: result: { sessionId, status: 'ready' }
+  K->>U: sidebar mostra UI do Apoia
+  loop trocas (chat, refine, …)
+    U->>A: interação
+    A->>H: host.readCurrentContent()
+    H-->>A: { html, plainText }
+    A->>H: host.deliverResult({ sink, payload })
+  end
+  U->>A: finalizar
+  A->>H: host.deliverResult({ sink: 'editor', payload })
+  A-->>K: finalizeSession(handle, result)
+  K->>H: writeEditorText(result)  [SDK]
+        </div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 14. UI SHELL                                                   -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>UI shell · o que aparece no host</h2>
+        <div class="three-col">
+          <div class="card">
+            <h3>Floating button</h3>
+            <p class="small">32 px → 48 px no hover. <b>Drag-Y</b> com threshold de 4 px para reposicionar. Estado e posição persistidos.</p>
+          </div>
+          <div class="card">
+            <h3>Split pane</h3>
+            <p class="small">Sidebar que <b>espreme</b> o <code>&lt;body&gt;</code> via <code>padding-right</code> (não overlay). Handle arrastável, snap em &le; 50 px = fecha.</p>
+          </div>
+          <div class="card">
+            <h3>App host</h3>
+            <p class="small">Renderiza <code>iframe</code> / <code>react</code> / <code>headless</code>. Cache escondido de iframes evita reload ao alternar.</p>
+          </div>
+        </div>
+        <p class="muted small" style="margin-top: 18px;">CSS isolado em <b>Shadow DOM</b> &mdash; o estilo do host não vaza, o do iAgente não vaza para o host.</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 15. SHADOW DOM + SQUEEZE                                       -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>Isolamento &times; Coexistência</h2>
+        <div class="two-col">
+          <div class="card">
+            <h3>Shadow DOM</h3>
+            <p class="small">A árvore React do shell monta num <code>shadowRoot</code>. Estilos do host (Bootstrap, jQuery UI, Angular Material&hellip;) não alcançam a UI do iAgente.</p>
+          </div>
+          <div class="card">
+            <h3>Host squeeze</h3>
+            <p class="small">Em vez de overlay (z-index trap), o kernel injeta <code>html.iagente-open &#123; padding-right: var(--iagente-width) &#125;</code>. A página continua interativa &mdash; só fica mais estreita.</p>
+          </div>
+        </div>
+        <pre class="compact"><code class="language-css">:host { all: initial; }
+.iagente-fab { position: fixed; right: 0; width: 32px; ... }
+.iagente-fab:hover { width: 48px; }   /* hover expand */
+.iagente-pane { width: var(--iagente-width, 420px); }</code></pre>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 16. STORAGE                                                    -->
+      <!-- ============================================================== -->
+      <section>
+        <h2><code>@iagente/storage</code></h2>
+        <p>Pequena abstração para persistência local do shell. <b>Falha segura</b> para in-memory se <code>localStorage</code> lançar (modo privado do Safari, cookies bloqueados&hellip;).</p>
+        <pre><code class="language-typescript">interface IStorage {
+  get&lt;T = unknown&gt;(key: string): T | null;
+  set(key: string, value: unknown): void;
+  remove(key: string): void;
+  keysWithPrefix(prefix: string): readonly string[];
+}
+
+export const STORAGE_KEYS = {
+  preferredApp: 'iagente.preferred.app',
+  fabPosition:  'iagente.shell.fab',
+  paneWidth:    'iagente.shell.pane.width',
+  // ...
+} as const;
+
+export function createLocalStorage(): IStorage;     // com probe
+export function createInMemoryStorage(): IStorage;  // fallback</code></pre>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 17. ADAPTADOR DE HOST - EXEMPLO                                -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>Adaptador de host · a única coisa específica do sistema</h2>
+        <pre><code class="language-typescript">// packages/hosts/demo-host/src/index.ts
+export const demoHostAdapter: HostAdapter = {
+  id: 'demo-host',
+  score: (probe) =&gt; probe.location.pathname.startsWith('/demo') ? 100 : 0,
+  activate(ctx) {
+    return {
+      'case': new DemoCaseAdapter(),
+      'doc':  new DemoDocAdapter(),
+    };
+  },
+};
+
+class DemoCaseAdapter implements ICaseManagementSystem {
+  readonly capabilityId = 'case' as const;
+  async getOpenCase() { return { number: '0001234-56.2024.4.02.5000' }; }
+  async getParties()  { return [...]; }
+  async getMovements(){ return [...]; }
+}</code></pre>
+        <p class="muted small">Para um sistema real: substituir <code>DemoCaseAdapter</code> por <code>EprocCaseAdapter</code> que lê o DOM do eproc. <b>O resto do iAgente não sabe a diferença.</b></p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 18. ADAPTADOR DE APP - EXEMPLO                                 -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>Adaptador de app · iframe vs react</h2>
+        <pre><code class="language-typescript">// app-apoia (iframe)
+export const apoiaApp: AppDescriptor = {
+  id: 'apoia', name: 'Apoia',
+  categories: ['ai'], capability: 'ai',
+  intents: [{ id: 'summarize', label: 'Resumir', icon: '📄' }, ...],
+  ui: { type: 'iframe',
+        urlBuilder: buildApoiaUrl,         // %26 encoding
+        allowedOrigins: ['https://apoia.pdpj.jus.br'] },
+  createAssistant: (cfg) =&gt; new ApoiaAssistant(cfg),
+};
+
+// app-nps (react bundled)
+export const npsApp: AppDescriptor = {
+  id: 'nps', name: 'Pesquisa de Satisfação',
+  categories: ['feedback'], capability: 'feedback',
+  intents: [{ id: 'rate', label: 'Avaliar atendimento' }],
+  ui: { type: 'react', root: NpsRoot },
+  createAssistant: (cfg) =&gt; new NpsAssistant(cfg),
+};</code></pre>
+        <p class="muted small">Um único contrato (<code>AppDescriptor</code>), três modos de UI. <b>Adicionar um app = adicionar uma entrada em <code>APP_DESCRIPTORS</code>.</b></p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 19. RUNTIME ENTRY                                              -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>Runtime · do <code>&lt;script&gt;</code> à UI montada</h2>
+        <pre><code class="language-typescript">// packages/runtime/script-tag/src/entry.tsx
+export function start(doc = globalThis.document) {
+  const storage  = createLocalStorage();
+  const bus      = new CapabilityBus();
+  const registry = new AppRegistry();
+  const orch     = bootstrap({ hostAdapters: HOST_ADAPTERS, bus });
+
+  for (const app of APP_DESCRIPTORS) registerApp(bus, registry, app);
+  applyPreferredApp(registry, bus, storage);
+
+  const overlay = createOverlay({ document: doc });
+  createRoot(overlay.root).render(
+    &lt;IagenteShell bus={bus} registry={registry} storage={storage} /&gt;
+  );
+  injectHostLayoutCSS(doc, overlay);
+  return orch.session;
+}</code></pre>
+        <p class="muted small">Saída: bundle IIFE de 1.7 MB minificado (React do NPS incluído) &mdash; serve de CDN ou é injetado por uma extensão de navegador.</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 20. N + M, NÃO N × M                                          -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>Por que isto escala: <b>N + M</b>, não <b>N × M</b></h2>
+        <div class="two-col">
+          <div class="card">
+            <h3 class="rose">Acoplamento por classe</h3>
+            <p class="small">4 hosts × 3 apps = <b>12</b> classes tipo <code>EprocApoiaAdapter</code>, <code>EprocAssisAdapter</code>, <code>PJeApoiaAdapter</code>&hellip;</p>
+          </div>
+          <div class="card">
+            <h3 class="green">Acoplamento por interface</h3>
+            <p class="small">4 hosts × 3 apps = <b>4 + 3 = 7</b> adaptadores. Cada lado implementa só o que sabe; o kernel roteia.</p>
+          </div>
+        </div>
+        <p class="muted small" style="margin-top: 24px;">Adicionar um novo <b>app</b>: 1 descritor + 1 implementação de <code>IInteractiveAssistant</code>. <b>Nenhum</b> host é tocado.</p>
+        <p class="muted small">Adicionar um novo <b>host</b>: 1 <code>HostAdapter</code> + N implementações das interfaces expostas pelo host. <b>Nenhum</b> app é tocado.</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 21. O QUE FOI IMPLEMENTADO                                     -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>O que está pronto &mdash; e o que falta</h2>
+        <div class="two-col">
+          <div class="card">
+            <h3 class="green">Pronto</h3>
+            <ul class="small">
+              <li>CapabilityBus com prioridade e notificação</li>
+              <li>AppRegistry com persistência de preferência</li>
+              <li>IInteractiveAssistant + IDocumentManagementSystem</li>
+              <li>ITransport: postMessage + in-process</li>
+              <li>AppUi: iframe / react / headless</li>
+              <li>UI shell completo: floating button, split-pane, menu, settings</li>
+              <li>App-apoia (iframe) e app-nps (react) como exemplos vivos</li>
+              <li>Bundle IIFE injetável de 1.7 MB</li>
+              <li>153 testes · 11 pacotes · TS 5.7 · React 19</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3 class="amber">Próximos passos</h3>
+            <ul class="small">
+              <li>Adapters de host reais (eproc, PJe, SEI)</li>
+              <li>Adapters de app reais (Apoia, Assis)</li>
+              <li>Carregamento como extensão de navegador</li>
+              <li>Sandbox de segurança no iframe (CSP, sandbox attrs)</li>
+              <li>Versionamento do protocolo JSON-RPC</li>
+              <li>Telemetria e tracing cross-frame</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 22. DEMO                                                       -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>Como ver funcionando</h2>
+        <pre><code class="language-bash">pnpm install
+pnpm -r run build          # builda os 11 pacotes
+pnpm -r run test           # roda os 153 testes
+pnpm dev:demo              # abre http://localhost:5174/demo/</code></pre>
+        <p class="muted small">A página <code>/demo/</code> é um hospedeiro simulado (Processo Administrativo mock). O runtime IIFE é injetado automaticamente; clique no botão flutuante e depois em <b>Resumir</b> &mdash; o Apoia de verdade abre dentro do iframe (ou o NPS, se você tiver mudado o app preferido nas configurações).</p>
+        <p class="green small" style="margin-top: 18px;">Abra o DevTools para inspecionar o Shadow DOM, as mensagens <code>postMessage</code> e o envelope JSON-RPC.</p>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- 23. ENCERRAMENTO                                               -->
+      <!-- ============================================================== -->
+      <section>
+        <h2>Obrigado</h2>
+        <p class="muted">Perguntas, críticas, casos reais do TRF2 &mdash; tudo bem-vindo.</p>
+        <p class="small muted" style="margin-top: 60px;">
+          iAgente · POC arquitetural · 11 pacotes · 153 testes<br/>
+          TypeScript 5.7 · React 19 · Vite 6 · Vitest 2.1.9
+        </p>
+        <p class="footer">FIM</p>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+  <script type="module">
+    // Mermaid renders each <div class="mermaid">…</div> as inline SVG.
+    // We set htmlLabels:true so <br/> inside node labels becomes a real line
+    // break (otherwise the labels collapse to a single line in 10.x).
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      securityLevel: 'loose',
+      flowchart: { htmlLabels: true, useMaxWidth: true, curve: 'basis' },
+      sequence:  { useMaxWidth: true, diagramMarginX: 8, diagramMarginY: 8, boxMargin: 10, actorMargin: 60 },
+    });
+
+    async function renderAll() {
+      const blocks = document.querySelectorAll('.mermaid');
+      for (let i = 0; i < blocks.length; i++) {
+        const el = blocks[i];
+        const id = 'mermaid-' + i + '-' + Math.random().toString(36).slice(2, 6);
+        const source = el.textContent;
+        try {
+          const { svg } = await mermaid.render(id, source);
+          el.innerHTML = svg;
+        } catch (e) {
+          el.innerHTML = '<pre style="color:#f88;font-size:0.5em">' + (e?.message || e) + '</pre>';
+        }
+      }
+    }
+
+    Reveal.initialize({
+      hash: true,
+      controls: true,
+      progress: true,
+      slideNumber: 'c/t',
+      plugins: [RevealHighlight, RevealNotes],
+    }).then(renderAll);
+  </script>
+</body>
+</html>

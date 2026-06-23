@@ -1,0 +1,36 @@
+// Interactive session lifecycle — sequence-style using a left-to-right
+// digraph where each actor is a column and arrows flow top-to-bottom.
+// Invisible edges pin column ordering; rank=same keeps actors on one row.
+digraph sequence {
+  rankdir=TB;
+  bgcolor="transparent";
+  compound=true;
+  nodesep=0.45;
+  ranksep=0.7;
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, fontcolor="#e8e8e8", color="#9aa0a6"];
+  edge  [color="#9aa0a6", fontname="Helvetica", fontsize=9, fontcolor="#9aa0a6"];
+
+  // Actors in a single rank, columns ordered U → H → K → A
+  { rank=same;
+    U [label="User",         fillcolor="#3a3a3a", color="#9aa0a6"];
+    H [label="Host (eproc)", fillcolor="#1a2333", color="#4f8cff"];
+    K [label="iAgente kernel", fillcolor="#2a2418", color="#f5a623"];
+    A [label="Apoia (iframe)", fillcolor="#15301f", color="#3ecf8e"];
+  }
+  U -> H -> K -> A [style=invis];
+
+  // Messages (top to bottom)
+  U -> H  [label="1. clica 'Resumir'"];
+  H -> K  [label="2. launchApp({intent:'summarize', docId})"];
+  K -> K  [label="3. applyPreferredApp() → 'apoia'", style=dashed];
+  K -> A  [label="4. iframe src = buildApoiaUrl(ctx)"];
+  A -> K  [label="5. postMessage: app.handshake"];
+  K -> A  [label="6. app.launch(ctx)"];
+  A -> A  [label="7. beginSession(ctx) — auth + load doc", style=dashed];
+  A -> K  [label="8. result: {sessionId, status:'ready'}"];
+  K -> U  [label="9. sidebar mostra UI do Apoia", color="#3ecf8e"];
+  A -> H  [label="10..n. host.readCurrentContent()\nhost.deliverResult()"];
+  A -> H  [label="n+1. host.deliverResult({sink:'editor'})"];
+  A -> K  [label="n+2. finalizeSession(handle, result)"];
+  K -> H  [label="n+3. writeEditorText(result) [SDK]"];
+}

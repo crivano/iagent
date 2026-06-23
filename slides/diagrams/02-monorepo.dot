@@ -1,0 +1,44 @@
+// Monorepo: 11 packages, dependency edges
+digraph monorepo {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, color="#4f8cff", fillcolor="#1a2333", fontcolor="#e8e8e8"];
+  edge [color="#9aa0a6", arrowsize=0.7];
+
+  RUNTIME [label="runtime/script-tag\n(IIFE bundle)", color="#ff5d8f", fillcolor="#2a1a1f"];
+  UI      [label="ui\n(shell, panels, menu)"];
+  CORE    [label="core\n(bus, registry, detector)"];
+  SDK     [label="sdk\n(@iagente/app-sdk)"];
+  RPC     [label="rpc\n(proxy, transports)"];
+  PROTO   [label="protocol\n(interfaces, JSON-RPC)", color="#3ecf8e", fillcolor="#15301f"];
+  STORAGE [label="storage\n(IStorage abstraction)"];
+
+  APPOIA  [label="apps/app-apoia\n(iframe adapter)"];
+  APPNPS  [label="apps/app-nps\n(react adapter)"];
+  APPDEMO [label="apps/demo-app\n(sandbox)"];
+
+  HOSTDEMO [label="hosts/demo-host\n(sandbox)"];
+
+  // RUNTIME
+  RUNTIME -> UI;  RUNTIME -> CORE; RUNTIME -> APPOIA; RUNTIME -> APPNPS;
+  RUNTIME -> HOSTDEMO; RUNTIME -> STORAGE;
+
+  // UI
+  UI -> CORE; UI -> PROTO;
+
+  // Apps
+  APPOIA -> SDK; APPNPS -> SDK; APPDEMO -> SDK;
+  APPOIA -> PROTO; APPNPS -> PROTO; HOSTDEMO -> PROTO;
+
+  // Core
+  CORE -> PROTO; CORE -> RPC;
+
+  // RPC
+  RPC -> PROTO;
+
+  // SDK
+  SDK -> PROTO; SDK -> RPC;
+
+  // Storage is leaf
+  STORAGE [color="#9aa0a6"];
+}

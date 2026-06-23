@@ -26,6 +26,8 @@ export interface OverlayOptions {
   readonly css?: string;
   /** Custom tag for the host element. Default 'iagente-overlay'. */
   readonly hostTag?: string;
+  /** Document to use for element creation. Defaults to global `document`. */
+  readonly document?: Document;
 }
 
 /**
@@ -36,23 +38,24 @@ export interface OverlayOptions {
  *   overlay.render(<Sidebar />);
  */
 export function createOverlay(opts: OverlayOptions = {}): OverlayHandle {
-  const host = document.createElement(opts.hostTag ?? 'iagente-overlay');
+  const doc = opts.document ?? document;
+  const host = doc.createElement(opts.hostTag ?? 'iagente-overlay');
   // Attach BEFORE appending to the page so we can style synchronously.
   const shadow = host.attachShadow({ mode: 'open' });
 
   if (opts.css) {
-    const style = document.createElement('style');
+    const style = doc.createElement('style');
     style.textContent = opts.css;
     shadow.appendChild(style);
   }
 
   // Container where React will mount its tree (after the <style>).
-  const mountPoint = document.createElement('div');
+  const mountPoint = doc.createElement('div');
   mountPoint.setAttribute('data-iagente-root', 'true');
   shadow.appendChild(mountPoint);
 
   // Append host element to the page last (so all structure is ready).
-  document.body.appendChild(host);
+  doc.body.appendChild(host);
 
   const root: Root = createRoot(mountPoint);
 

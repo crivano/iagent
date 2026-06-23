@@ -1,0 +1,18 @@
+// JSON-RPC 2.0 envelope: request, response, notification
+digraph jsonrpc {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [shape=record, fontname="Courier:Helvetica", fontsize=11, color="#e8e8e8"];
+
+  REQ [label="{ Request | { jsonrpc: \"2.0\" | id: \"req-7c3a\" | method: \"ai.beginSession\" | params: { intent, documentId, user } } }",
+       color="#4f8cff", fillcolor="#1a2333"];
+
+  RES [label="{ Response | { jsonrpc: \"2.0\" | id: \"req-7c3a\" | result: { sessionId, status } } }",
+       color="#3ecf8e", fillcolor="#15301f"];
+
+  NOT [label="{ Notification | { jsonrpc: \"2.0\" | method: \"host.documentChanged\" | params: { ... } } }",
+       color="#f5a623", fillcolor="#2a2418"];
+
+  REQ -> RES [label="match by id", color="#9aa0a6", style=dashed];
+  REQ -> NOT [style=invis];
+}
