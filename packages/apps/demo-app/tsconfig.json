@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "tsBuildInfoFile": "./demo-app.tsbuildinfo"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "src/**/*.test.ts"],
+  "references": [{ "path": "../../protocol" }, { "path": "../../sdk" }]
+}

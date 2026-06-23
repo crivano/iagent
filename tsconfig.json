@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/protocol" },
+    { "path": "./packages/rpc" },
+    { "path": "./packages/core" },
+    { "path": "./packages/ui" },
+    { "path": "./packages/sdk" },
+    { "path": "./packages/storage" },
+    { "path": "./packages/hosts/demo-host" },
+    { "path": "./packages/apps/demo-app" },
+    { "path": "./packages/apps/app-apoia" },
+    { "path": "./packages/apps/app-nps" },
+    { "path": "./packages/runtime/script-tag" }
+  ]
+}

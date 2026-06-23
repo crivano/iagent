@@ -1,0 +1,33 @@
+{
+  "name": "@iagente/runtime-script-tag",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/iagente.js",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite --config vite.demo.config.ts",
+    "preview": "vite preview --config vite.demo.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@iagente/protocol": "workspace:*",
+    "@iagente/rpc": "workspace:*",
+    "@iagente/core": "workspace:*",
+    "@iagente/ui": "workspace:*",
+    "@iagente/storage": "workspace:*",
+    "@iagente/host-demo": "workspace:*",
+    "@iagente/app-apoia": "workspace:*",
+    "@iagente/app-nps": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "jsdom": "^25.0.0",
+    "vite": "^6.0.0"
+  }
+}

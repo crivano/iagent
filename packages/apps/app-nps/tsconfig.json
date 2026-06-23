@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "tsBuildInfoFile": "./app-nps.tsbuildinfo"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "src/**/*.test.ts", "src/**/*.test.tsx"],
+  "references": [{ "path": "../../protocol" }]
+}

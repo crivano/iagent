@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "tsBuildInfoFile": "./core.tsbuildinfo"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "src/**/*.test.ts"],
+  "references": [
+    { "path": "../protocol" },
+    { "path": "../rpc" },
+    { "path": "../storage" }
+  ]
+}

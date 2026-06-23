@@ -1,0 +1,20 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "tsBuildInfoFile": "./script-tag.tsbuildinfo",
+    "noEmit": false,
+    "composite": false,
+    "declaration": false
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "src/**/*.test.ts"],
+  "references": [
+    { "path": "../../protocol" },
+    { "path": "../../rpc" },
+    { "path": "../../core" },
+    { "path": "../../ui" },
+    { "path": "../../hosts/demo-host" }
+  ]
+}

@@ -1,0 +1,7 @@
+packages:
+  - "packages/*"
+  - "packages/hosts/*"
+  - "packages/apps/*"
+  - "packages/runtime/*"
+allowBuilds:
+  esbuild: false

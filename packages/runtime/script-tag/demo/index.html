@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iAgente — Demo Host</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: #f5f5f5;
+      color: #1a1a1a;
+    }
+    header { margin-bottom: 24px; }
+    header h1 { margin: 0 0 4px; font-size: 22px; }
+    header p  { margin: 0; color: #666; font-size: 13px; }
+    .case-header {
+      background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
+      padding: 16px; margin-bottom: 16px;
+    }
+    .case-header span[data-demo-case-number] { font-weight: 600; font-size: 16px; }
+    .parties, .movements { list-style: none; padding: 0; margin: 8px 0; }
+    .parties li, .movements li {
+      padding: 6px 0;
+      font-size: 14px;
+      color: #444;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .movements time { color: #999; font-size: 12px; margin-right: 8px; }
+    .editor {
+      background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
+      padding: 16px; margin-top: 16px;
+    }
+    .editor textarea {
+      width: 100%; min-height: 140px;
+      font-family: 'Georgia', serif; font-size: 15px; line-height: 1.5;
+      padding: 12px; border: 1px solid #ddd; border-radius: 4px;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    .editor label { display: block; margin-bottom: 8px; font-weight: 600; }
+    .legend {
+      margin-top: 32px; padding: 12px 16px; background: #fff8e1;
+      border: 1px solid #ffe082; border-radius: 6px; font-size: 13px; color: #6a4c00;
+    }
+    .legend code { background: #fff3cd; padding: 1px 5px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Processo Administrativo (Demo Host) — nº 0001-99.2024</h1>
+    <p>
+      Esta página simula um sistema hospedeiro para o iAgente. O bundle iAgente é
+      injetado abaixo. Ao carregar, ele detecta o host pelo atributo
+      <code>data-demo-case-number</code> e monta o overlay.
+    </p>
+  </header>
+
+  <section class="case-header">
+    <span data-demo-case-number="0001-99.2024" data-demo-title="Proc 0001-99.2024">
+      Processo nº 0001-99.2024
+    </span>
+    <ul class="parties">
+      <li data-demo-party="João" data-demo-name="João Silva" data-demo-role="autor">
+        <strong>Autor:</strong> João Silva
+      </li>
+      <li data-demo-party="Maria" data-demo-name="Maria Souza" data-demo-role="réu">
+        <strong>Réu:</strong> Maria Souza
+      </li>
+    </ul>
+    <ul class="movements">
+      <li data-demo-movement data-demo-date="2024-01-15">
+        <time>15/01/2024</time> Despacho determinou a intimação das partes
+      </li>
+      <li data-demo-movement data-demo-date="2024-01-20">
+        <time>20/01/2024</time> Petição juntada pelo autor
+      </li>
+    </ul>
+  </section>
+
+  <section class="editor">
+    <label for="editor">Texto do documento (será enviado à IA ao clicar "Resumir"):</label>
+    <textarea id="editor" data-demo-editor>Este é um documento de exemplo. Nele há várias frases que a IA pode resumir ou revisar. A integração com a Apoia ou com a Assis acontece de forma desacoplada: o iAgente não conhece o nome do app externo, apenas a interface que ele implementa. Quando o usuário clica em Resumir, o iAgente busca alguém que implemente IAICollaborator e envia o texto. O app devolve o resultado e o iAgente pode atualizar o documento no host via postMessage.</textarea>
+  </section>
+
+  <p class="legend">
+    💡 Dica: clique no botão <code>Resumir</code> na sidebar do iAgente (canto
+    inferior direito) e abra o <strong>Console do navegador</strong> para ver o
+    resultado retornado pela IA in-process.
+  </p>
+
+  <!-- O bundle do iAgente é servido do build (dev:demo) e injetado aqui. -->
+  <script type="module" src="/src/entry.tsx"></script>
+</body>
+</html>
