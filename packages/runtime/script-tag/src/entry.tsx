@@ -27,6 +27,7 @@ import { npsApp } from '@iagente/app-nps';
 import {
   AppHostPanel,
   IagenteShell,
+  InjectedActions,
   Menu,
   Settings,
   SHELL_CSS,
@@ -41,10 +42,13 @@ import type {
   AppDescriptor,
   AssistantIntent,
   CapabilityKey,
+  InjectedAction,
   LaunchContext,
+  LaunchIntentEventDetail,
   SessionHandle,
 } from '@iagente/protocol';
-import { useMemo, useState } from 'react';
+import { LAUNCH_INTENT_EVENT } from '@iagente/protocol';
+import { useEffect, useMemo, useState } from 'react';
 import type { FC } from 'react';
 
 /**
@@ -67,6 +71,43 @@ export const HOST_LAYOUT_CSS = `
     padding-right: var(--iagente-width, 380px) !important;
     transition: padding-right .15s ease;
   }
+`;
+
+/**
+ * CSS for host-injected CTAs. Unlike HOST_LAYOUT_CSS (which styles the host
+ * <body>), this styles the buttons we inject INTO the host's document. It
+ * must be in the LIGHT DOM (not shadow), so the runtime appends a <style>
+ * tag to <head>.
+ */
+export const HOST_CTA_CSS = `
+  .iagente-injected-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0;
+    padding: 8px 14px;
+    font: 500 14px/1.2 -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #fff;
+    background: #2563eb;
+    border: 1px solid #1d4ed8;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .12s ease, box-shadow .12s ease, transform .04s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .iagente-injected-action:hover { background: #1d4ed8; box-shadow: 0 2px 6px rgba(0,0,0,0.16); }
+  .iagente-injected-action:active { transform: translateY(1px); }
+  .iagente-injected-action:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+  .iagente-injected-action--secondary {
+    background: #fff; color: #1d4ed8; border-color: #cbd5e1;
+  }
+  .iagente-injected-action--secondary:hover { background: #f1f5f9; }
+  .iagente-injected-action--ghost {
+    background: transparent; color: #1d4ed8; border-color: transparent;
+  }
+  .iagente-injected-action--ghost:hover { background: rgba(37, 99, 235, 0.08); }
+  .iagente-injected-action__icon { font-size: 14px; }
+  .iagente-injected-action__label { white-space: nowrap; }
 `;
 
 /**
@@ -114,6 +155,16 @@ export function startIagente(opts: {
     doc.head.appendChild(layoutStyle);
   }
 
+  // Inject the CSS that styles host-injected CTAs (must be in the LIGHT DOM,
+  // not the iAgente shadow root).
+  const ctaStyleId = 'iagente-cta-styles';
+  if (!doc.getElementById(ctaStyleId)) {
+    const ctaStyle = doc.createElement('style');
+    ctaStyle.id = ctaStyleId;
+    ctaStyle.textContent = HOST_CTA_CSS;
+    doc.head.appendChild(ctaStyle);
+  }
+
   // --- 5. Mount overlay + IagenteShell ---
   const overlay = createOverlay({ css: SHELL_CSS, hostTag: 'iagente-overlay', document: doc });
 
@@ -126,8 +177,10 @@ export function startIagente(opts: {
       bus={bus}
       appRegistry={appRegistry}
       hostId={hostSession.hostId}
+      injectedActions={hostSession.injectedActions}
       onShellOpen={openHost}
       onShellClose={closeHost}
+      document={doc}
     />,
   );
 
@@ -136,6 +189,7 @@ export function startIagente(opts: {
       overlay.unmount();
       closeHost();
       layoutStyle?.remove();
+      doc.getElementById('iagente-cta-styles')?.remove();
       appDisposers.forEach((d) => d());
       hostSession.dispose();
     },
@@ -150,8 +204,11 @@ interface RuntimeRootProps {
   readonly bus: CapabilityBus;
   readonly appRegistry: AppRegistry;
   readonly hostId: string;
+  readonly injectedActions: readonly InjectedAction[];
   readonly onShellOpen: () => void;
   readonly onShellClose: () => void;
+  /** Document the CTAs are injected into (host's document). */
+  readonly document: Document;
 }
 
 const RuntimeRoot: FC<RuntimeRootProps> = ({
@@ -159,13 +216,21 @@ const RuntimeRoot: FC<RuntimeRootProps> = ({
   bus,
   appRegistry,
   hostId,
+  injectedActions,
   onShellOpen,
   onShellClose,
+  document: doc,
 }) => {
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [launchCtx, setLaunchCtx] = useState<LaunchContext | null>(null);
   const [sessionHandle, setSessionHandle] = useState<SessionHandle | null>(null);
+  /**
+   * Bumped on every `iagente:launch-intent` CustomEvent so the IagenteShell
+   * opens in response to a host-injected CTA click. The shell listens for
+   * transitions, not the absolute value.
+   */
+  const [openSignal, setOpenSignal] = useState(0);
 
   const registeredApps = useMemo(() => appRegistry.list(), [appRegistry]);
   const selectedApp = useMemo(
@@ -174,7 +239,7 @@ const RuntimeRoot: FC<RuntimeRootProps> = ({
   );
 
   // Launch the selected app: build a LaunchContext, call beginSession.
-  const handleSelectApp = async (appId: string) => {
+  const handleSelectApp = async (appId: string, forcedIntent?: AssistantIntent) => {
     // End any previous session first.
     if (selectedApp && sessionHandle) {
       const prev = appRegistry.getApp(selectedApp.id);
@@ -194,9 +259,20 @@ const RuntimeRoot: FC<RuntimeRootProps> = ({
       case: ctx.case,
       document: ctx.document,
     };
-    const intents = await assistant.listIntents();
-    if (intents.length > 0) {
-      launch.intent = intents[0]!.intent as AssistantIntent;
+    if (forcedIntent) {
+      // Caller already specified which intent to start. Validate it's in the
+      // app's supported set; fall back to the first intent if not.
+      const supported = await assistant.listIntents();
+      if (supported.some((i) => i.intent === forcedIntent)) {
+        launch.intent = forcedIntent;
+      } else if (supported.length > 0) {
+        launch.intent = supported[0]!.intent as AssistantIntent;
+      }
+    } else {
+      const intents = await assistant.listIntents();
+      if (intents.length > 0) {
+        launch.intent = intents[0]!.intent as AssistantIntent;
+      }
     }
     const handle = await assistant.beginSession(launch.intent, launch);
     setSelectedAppId(appId);
@@ -211,12 +287,42 @@ const RuntimeRoot: FC<RuntimeRootProps> = ({
     }
   };
 
+  // Listen for `iagente:launch-intent` events from host-injected CTAs.
+  // Must be declared AFTER `handleSelectApp` to avoid TDZ.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<LaunchIntentEventDetail>).detail;
+      // Pre-select the app for the capability the CTA requested so the
+      // sidebar opens with the right context already loaded.
+      const preferred =
+        bus.getActive(detail.capability)?.provider ??
+        bus.listProviders(detail.capability)[0] ??
+        null;
+      if (preferred) {
+        const app = appRegistry.list().find((a) => a.id === preferred);
+        if (app) {
+          // Fire-and-forget: the shell must open NOW (synchronous), before
+          // the network call resolves.
+          setSelectedAppId(app.id);
+          void handleSelectApp(app.id, detail.intent);
+        }
+      }
+      setOpenSignal((n) => n + 1);
+    };
+    window.addEventListener(LAUNCH_INTENT_EVENT, handler);
+    return () => window.removeEventListener(LAUNCH_INTENT_EVENT, handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appRegistry, bus]);
+
   return (
+    <>
     <IagenteShell
       storage={storage}
       title={`iAgente — ${hostId}`}
       onOpen={onShellOpen}
       onClose={onShellClose}
+      openSignal={openSignal}
       renderHeaderExtras={() => (
         <button
           type="button"
@@ -255,6 +361,10 @@ const RuntimeRoot: FC<RuntimeRootProps> = ({
         )
       }
     />
+    {/* Host-declared CTAs: real DOM nodes inserted into the host's own
+        document, not the shadow root. Returns null in the React tree. */}
+    <InjectedActions actions={injectedActions} document={doc} />
+    </>
   );
 };
 

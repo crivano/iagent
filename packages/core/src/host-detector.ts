@@ -52,6 +52,12 @@ export interface HostCapabilities {
   readonly case?: import('@iagente/protocol').ICaseManagementSystem;
   readonly document?: import('@iagente/protocol').IDocumentManagementSystem;
   readonly auth?: import('@iagente/protocol').IAuthHelper;
+  /**
+   * Call-to-action buttons the host wants the iAgente shell to inject into
+   * its own DOM. The shell reads these AFTER host activation and mounts each
+   * action at the declared `targetSelector` / `placement`.
+   */
+  readonly injectedActions?: readonly import('@iagente/protocol').InjectedAction[];
 }
 
 /** Context given to a host adapter on activation. */

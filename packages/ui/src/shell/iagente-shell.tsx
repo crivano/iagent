@@ -14,7 +14,7 @@
  * implementation details (those are added in subsequent phases).
  */
 
-import { useCallback, useState, type FC, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type FC, type ReactNode } from 'react';
 import type { IStorage } from '@iagente/storage';
 import { STORAGE_KEYS } from '@iagente/storage';
 import { FloatingButton } from './floating-button.js';
@@ -44,6 +44,15 @@ export interface IagenteShellProps {
    * (persisted under STORAGE_KEYS.sidebarOpen).
    */
   readonly initialOpen?: boolean;
+  /**
+   * External signal: when this number changes, the shell opens. Used by the
+   * runtime to open the shell in response to host-injected CTAs (the
+   * `iagente:launch-intent` CustomEvent). The actual value doesn't matter;
+   * only the transition matters — so callers bump a counter on each event.
+   *
+   * Default: 0. Pass a stateful counter to open the shell programmatically.
+   */
+  readonly openSignal?: number;
 }
 
 export const IagenteShell: FC<IagenteShellProps> = ({
@@ -54,10 +63,18 @@ export const IagenteShell: FC<IagenteShellProps> = ({
   onOpen,
   onClose,
   initialOpen,
+  openSignal = 0,
 }) => {
   const persistedOpen =
     initialOpen ?? storage.getOrDefault<boolean>(STORAGE_KEYS.sidebarOpen, false);
   const [open, setOpen] = useState(persistedOpen);
+
+  // Tracks the last openSignal value we acted on. We only react to GROWING
+  // transitions (a new, higher counter), not to every re-render where the
+  // signal is still > 0. Without this, calling `setOpen(false)` from the
+  // close button would re-run the effect (because `open` changed) and
+  // immediately reopen the shell.
+  const lastSeenSignal = useRef(openSignal);
 
   const handleOpen = useCallback(() => {
     setOpen(true);
@@ -74,6 +91,16 @@ export const IagenteShell: FC<IagenteShellProps> = ({
     storage.set(STORAGE_KEYS.sidebarOpen, false);
     onClose?.();
   }, [storage, onClose]);
+
+  // React ONLY to growing transitions of openSignal. Initial render with
+  // openSignal=0 is ignored; a transition to 1 (or any higher value than the
+  // last seen) triggers a one-shot open.
+  useEffect(() => {
+    if (openSignal > lastSeenSignal.current) {
+      lastSeenSignal.current = openSignal;
+      handleOpen();
+    }
+  }, [openSignal, handleOpen]);
 
   if (!open) {
     return <FloatingButton onOpen={handleOpen} storage={storage} />;

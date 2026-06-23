@@ -13,3 +13,7 @@ export {
 } from './shell/app-host-panel.js';
 export { Menu, type MenuProps } from './shell/menu.js';
 export { Settings, type SettingsProps } from './shell/settings.js';
+export {
+  InjectedActions,
+  type InjectedActionsProps,
+} from './shell/injected-actions.js';

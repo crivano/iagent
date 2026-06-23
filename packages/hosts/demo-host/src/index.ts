@@ -20,6 +20,7 @@ import type {
   IAuthHelper,
   ICaseManagementSystem,
   IDocumentManagementSystem,
+  InjectedAction,
   Json,
   Movement,
   Party,
@@ -212,6 +213,22 @@ export const demoHostAdapter: HostAdapter = {
       case: new DemoCaseManagementSystem(ctx.document),
       document: new DemoDocumentManagementSystem(ctx.document),
       auth: new DemoAuthHelper(ctx.window),
+      // The host declares CTAs the iAgente shell should inject into the host
+      // DOM. Each entry maps an intent to a target element in the host's own
+      // markup, keeping the buttons in the natural document flow (no
+      // position:fixed, no z-index wars).
+      injectedActions: [
+        {
+          id: 'cta-summarize',
+          label: 'Resumir',
+          icon: '✦',
+          intent: 'summarize',
+          capability: 'ai',
+          targetSelector: '[data-demo-editor]',
+          placement: 'after',
+          variant: 'primary',
+        } satisfies InjectedAction,
+      ],
     };
   },
 };

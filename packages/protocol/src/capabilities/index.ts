@@ -298,6 +298,80 @@ export interface IFeedbackCollector
   readonly capabilityId: 'feedback';
 }
 
+// --- Host-injected actions (CTAs in the host page) -------------------------
+
+/**
+ * Description of a call-to-action the host adapter wants the iAgente shell to
+ * inject into the host page's DOM.
+ *
+ * The host owns the position: it declares a `targetSelector` (CSS selector
+ * inside its own DOM) and an `placement` ('before' | 'after' | 'inside-start'
+ * | 'inside-end'). The kernel inserts the button as a sibling/child of the
+ * resolved element — keeping it in the natural document flow (no `position:
+ * fixed`, no z-index wars).
+ *
+ * Clicking the button dispatches an `iagente:launch-intent` CustomEvent on
+ * `window`. The IagenteShell listens for it and opens the sidebar with the
+ * matching app + intent already selected.
+ *
+ * Example (declared by a host adapter):
+ *   {
+ *     id: 'cta-summarize',
+ *     label: 'Resumir',
+ *     intent: 'summarize',
+ *     capability: 'ai',
+ *     targetSelector: '[data-demo-editor]',
+ *     placement: 'after',
+ *     variant: 'primary',
+ *   }
+ */
+export interface InjectedAction {
+  /** Stable id (used for re-registration and tests). */
+  readonly id: string;
+  /** Visible label of the button. */
+  readonly label: string;
+  /** Optional icon (emoji or short text) shown before the label. */
+  readonly icon?: string;
+  /**
+   * Intent to launch when the button is clicked. Mapped to a registered
+   * `IntentDescriptor` in the AppRegistry.
+   */
+  readonly intent: AssistantIntent;
+  /**
+   * Capability key this action belongs to (e.g. 'ai', 'feedback'). Used by
+   * the shell to pick the preferred app for the intent.
+   */
+  readonly capability: CapabilityKey;
+  /** CSS selector in the host's document where the button is mounted. */
+  readonly targetSelector: string;
+  /**
+   * Position relative to the target element:
+   *  - 'before'        → previous sibling
+   *  - 'after'         → next sibling
+   *  - 'inside-start'  → first child
+   *  - 'inside-end'    → last child
+   */
+  readonly placement: 'before' | 'after' | 'inside-start' | 'inside-end';
+  /** Visual variant. Mirrors the host's button vocabulary. */
+  readonly variant?: 'primary' | 'secondary' | 'ghost';
+}
+
+/**
+ * Detail payload of the `iagente:launch-intent` CustomEvent. The shell uses
+ * this to (1) open the sidebar and (2) preselect the app + intent.
+ */
+export interface LaunchIntentEventDetail {
+  /** Id of the InjectedAction that fired the event. */
+  readonly actionId: string;
+  /** Capability key (e.g. 'ai'). */
+  readonly capability: CapabilityKey;
+  /** Intent to start. */
+  readonly intent: AssistantIntent;
+}
+
+/** Name of the CustomEvent fired by injected CTA buttons. */
+export const LAUNCH_INTENT_EVENT = 'iagente:launch-intent';
+
 // --- Capability catalog -----------------------------------------------------
 
 /**

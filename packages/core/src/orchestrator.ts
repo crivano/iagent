@@ -11,7 +11,7 @@
  * everything from the bus. State is purely in-memory: nothing is persisted.
  */
 
-import type { CapabilityKey } from '@iagente/protocol';
+import type { CapabilityKey, InjectedAction } from '@iagente/protocol';
 import type { CapabilityBus } from './capability-bus.js';
 import {
   detectHost,
@@ -26,6 +26,12 @@ export interface Session {
   readonly hostId: string | null;
   /** All capability keys the host published. */
   readonly providedCapabilities: readonly CapabilityKey[];
+  /**
+   * CTAs the host wants the iAgente shell to inject into the host's DOM.
+   * The runtime reads this and mounts each button at the declared position.
+   * Empty array when the host didn't declare any.
+   */
+  readonly injectedActions: readonly InjectedAction[];
   /** Tear down the session, unregistering everything. */
   dispose(): void;
 }
@@ -59,7 +65,7 @@ export function bootstrap(
   }
 
   if (!adapter) {
-    return { hostId: null, providedCapabilities: [], dispose: () => {} };
+    return { hostId: null, providedCapabilities: [], injectedActions: [], dispose: () => {} };
   }
 
   // Activate the adapter, gathering its capabilities.
@@ -91,6 +97,7 @@ export function bootstrap(
   return {
     hostId: adapter.descriptor.id,
     providedCapabilities: provided,
+    injectedActions: caps.injectedActions ?? [],
     dispose() {
       disposers.forEach((d) => d());
       adapter?.dispose?.();

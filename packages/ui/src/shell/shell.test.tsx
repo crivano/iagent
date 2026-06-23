@@ -185,4 +185,81 @@ describe('IagenteShell', () => {
     });
     expect(closes).toBe(1);
   });
+
+  it('opening via openSignal then closing with X stays closed (regression: signal > 0 must not re-open)', async () => {
+    // Reproduces the bug: when a host-injected CTA (e.g. "Resumir") opens
+    // the shell via openSignal, clicking the close button should keep the
+    // shell closed. Before the fix, the useEffect re-ran on the open→closed
+    // transition and re-opened the shell immediately.
+    const storage = createInMemoryStorage();
+    let opens = 0;
+    let closes = 0;
+    const { getByRole, queryByRole, rerender } = render(
+      <IagenteShell
+        storage={storage}
+        title="t"
+        renderBody={() => null}
+        initialOpen={false}
+        openSignal={0}
+        onOpen={() => opens++}
+        onClose={() => closes++}
+      />,
+    );
+    // Sanity: starts closed.
+    expect(queryByRole('button', { name: /fechar iagente/i })).toBeNull();
+
+    // Bump the signal → shell should open.
+    rerender(
+      <IagenteShell
+        storage={storage}
+        title="t"
+        renderBody={() => null}
+        initialOpen={false}
+        openSignal={1}
+        onOpen={() => opens++}
+        onClose={() => closes++}
+      />,
+    );
+    expect(getByRole('button', { name: /fechar iagente/i })).toBeTruthy();
+    expect(opens).toBe(1);
+
+    // User clicks X to close. BUG: shell reopens. FIX: shell stays closed.
+    await act(async () => {
+      fireEvent.click(getByRole('button', { name: /fechar iagente/i }));
+    });
+    expect(closes).toBe(1);
+    // After close, the FAB should be back in place.
+    expect(queryByRole('button', { name: /fechar iagente/i })).toBeNull();
+    expect(getByRole('button', { name: /abrir iagente/i })).toBeTruthy();
+
+    // Re-render with the SAME signal (still 1) should NOT re-open.
+    rerender(
+      <IagenteShell
+        storage={storage}
+        title="t"
+        renderBody={() => null}
+        initialOpen={false}
+        openSignal={1}
+        onOpen={() => opens++}
+        onClose={() => closes++}
+      />,
+    );
+    expect(queryByRole('button', { name: /fechar iagente/i })).toBeNull();
+    expect(opens).toBe(1);
+
+    // But a NEW bump (signal goes 1 → 2) SHOULD re-open.
+    rerender(
+      <IagenteShell
+        storage={storage}
+        title="t"
+        renderBody={() => null}
+        initialOpen={false}
+        openSignal={2}
+        onOpen={() => opens++}
+        onClose={() => closes++}
+      />,
+    );
+    expect(getByRole('button', { name: /fechar iagente/i })).toBeTruthy();
+    expect(opens).toBe(2);
+  });
 });
